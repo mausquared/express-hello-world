@@ -1,37 +1,47 @@
-// Import Express.js
-const express = require('express');
-
-// Create an Express app
+const express = require("express");
 const app = express();
+const port = process.env.PORT || 3001;
 
-// Middleware to parse JSON bodies
+// This allows your app to parse JSON (required for WhatsApp messages)
 app.use(express.json());
 
-// Set port and verify_token
-const port = process.env.PORT || 3000;
-const verifyToken = process.env.VERIFY_TOKEN;
+// ---------------------------------------------------------
+// 1. THIS IS THE VERIFICATION CODE META NEEDS
+// ---------------------------------------------------------
+app.get("/webhook", (req, res) => {
+  // This grabs the verify token from your Render environment variables
+  const verify_token = process.env.VERIFY_TOKEN;
 
-// Route for GET requests
-app.get('/', (req, res) => {
-  const { 'hub.mode': mode, 'hub.challenge': challenge, 'hub.verify_token': token } = req.query;
+  // Parse params from the webhook verification request
+  let mode = req.query["hub.mode"];
+  let token = req.query["hub.verify_token"];
+  let challenge = req.query["hub.challenge"];
 
-  if (mode === 'subscribe' && token === verifyToken) {
-    console.log('WEBHOOK VERIFIED');
-    res.status(200).send(challenge);
-  } else {
-    res.status(403).end();
+  // Check if a token and mode were sent
+  if (mode && token) {
+    // Check the mode and token sent are correct
+    if (mode === "subscribe" && token === verify_token) {
+      console.log("WEBHOOK_VERIFIED");
+      res.status(200).send(challenge);
+    } else {
+      // Responds with '403 Forbidden' if verify tokens do not match
+      res.sendStatus(403);
+    }
   }
 });
 
-// Route for POST requests
-app.post('/', (req, res) => {
-  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  console.log(`\n\nWebhook received ${timestamp}\n`);
-  console.log(JSON.stringify(req.body, null, 2));
-  res.status(200).end();
+// ---------------------------------------------------------
+// 2. THIS RECEIVES THE ACTUAL WHATSAPP MESSAGES LATER
+// ---------------------------------------------------------
+app.post("/webhook", (req, res) => {
+  console.log("Incoming webhook message:", JSON.stringify(req.body, null, 2));
+  res.sendStatus(200);
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`\nListening on port ${port}\n`);
-});
+// Just a basic home route to let you know the server is on
+app.get("/", (req, res) => res.type('html').send("WhatsApp Webhook Server is Live!"));
+
+const server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+
+server.keepAliveTimeout = 120 * 1000;
+server.headersTimeout = 120 * 1000;
